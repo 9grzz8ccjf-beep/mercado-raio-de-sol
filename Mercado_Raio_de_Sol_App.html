@@ -1,0 +1,50 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mercado Raio de Sol</title>
+<style>
+body{margin:0;background:#f4f5f6;color:#18212b;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+header{background:#18212b;color:white;padding:22px 18px;border-radius:0 0 22px 22px}h1{margin:0;font-size:22px}header p{margin:5px 0 0;opacity:.8}
+main{padding:16px;max-width:760px;margin:auto}.cards{display:grid;grid-template-columns:1fr 1fr;gap:10px}.card,.product{background:white;border-radius:16px;padding:14px;box-shadow:0 2px 10px #0001;margin-bottom:10px}
+.label,.muted{font-size:12px;color:#68737e}.value,.price{font-size:20px;font-weight:700;margin-top:4px}
+nav{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin:15px 0}button,input{font:inherit;border:1px solid #d8dde2;border-radius:12px;padding:11px;background:white}button{font-weight:600}.active{background:#18212b;color:#fff}
+.toolbar{display:flex;gap:8px;margin-bottom:10px}#search{flex:1}.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.name{font-weight:700}.tag{font-size:12px;background:#eef2f5;border-radius:999px;padding:4px 8px}.low{background:#fdecec;color:#b42318}
+.modal{position:fixed;inset:0;background:#0008;display:none;align-items:end}.modal.show{display:flex}.sheet{background:white;width:100%;padding:20px;border-radius:22px 22px 0 0}.sheet input{width:100%;margin:5px 0;box-sizing:border-box}.actions{display:flex;gap:8px;margin-top:8px}.actions button{flex:1}
+</style></head><body>
+<header><h1>☀️ Mercado Raio de Sol</h1><p>Precificação e controle de estoque</p></header>
+<main>
+<div class="cards"><div class="card"><div class="label">Produtos</div><div class="value" id="count">0</div></div>
+<div class="card"><div class="label">Margem média</div><div class="value" id="avg">0%</div></div>
+<div class="card"><div class="label">Estoque baixo</div><div class="value" id="low">0</div></div>
+<div class="card"><div class="label">Valor em estoque</div><div class="value" id="stock">R$ 0,00</div></div></div>
+<nav><button id="b1" class="active" onclick="tab('prod')">📦 Produtos</button><button id="b2" onclick="tab('calc')">💰 Precificar</button><button id="b3" onclick="tab('est')">📊 Estoque</button></nav>
+<section id="prod"><div class="toolbar"><input id="search" placeholder="🔎 Buscar produto" oninput="render()"><button onclick="newP()">＋</button></div><div id="list"></div></section>
+<section id="calc" style="display:none"><div class="card"><h2>💰 Calcular preço</h2><input id="cc" type="number" step=".01" placeholder="Custo"><input id="mm" type="number" value="30" step=".1" placeholder="Margem %"><div class="price" id="res">Preço sugerido: R$ 0,00</div></div></section>
+<section id="est" style="display:none"><div id="stocklist"></div></section>
+</main>
+<div class="modal" id="modal"><div class="sheet"><h2 id="title">Novo produto</h2>
+<input id="n" placeholder="Nome"><input id="c" placeholder="Categoria"><input id="co" type="number" step=".01" placeholder="Custo"><input id="pr" type="number" step=".01" placeholder="Venda"><input id="q" type="number" placeholder="Estoque atual"><input id="mi" type="number" placeholder="Estoque mínimo">
+<div class="actions"><button onclick="closeM()">Cancelar</button><button class="active" onclick="saveP()">Salvar</button></div></div></div>
+<script>
+const initial=[{"name": "Ketchup Hemmer 1kg", "category": "Mercearia", "cost": 12.99, "price": 18.99, "qty": 0, "min": 2}, {"name": "Leite Tirol 1L", "category": "Essenciais", "cost": 4.89, "price": 6.49, "qty": 0, "min": 6}, {"name": "Pão caseiro 600g", "category": "Padaria", "cost": 5, "price": 7.99, "qty": 0, "min": 2}, {"name": "Chineque Chef Salles 200g", "category": "Padaria", "cost": 4, "price": 6.49, "qty": 0, "min": 2}, {"name": "Bolo inglês Chef Salles", "category": "Padaria", "cost": 7, "price": 10.99, "qty": 0, "min": 2}, {"name": "Bolo recheado Chef Salles 300g", "category": "Padaria", "cost": 8.5, "price": 14.5, "qty": 0, "min": 2}, {"name": "Bolacha caseira Chef Salles 200g", "category": "Padaria", "cost": 4.8, "price": 7.5, "qty": 0, "min": 2}, {"name": "Massa de pastel 500g", "category": "Massas", "cost": 0, "price": 8.99, "qty": 0, "min": 2}, {"name": "Massa de pastel 400g", "category": "Massas", "cost": 4.73, "price": 7.49, "qty": 0, "min": 2}, {"name": "Brahma litrão", "category": "Bebidas", "cost": 7.47, "price": 11.99, "qty": 0, "min": 6}, {"name": "Original 300ml retornável", "category": "Bebidas", "cost": 3.11, "price": 4.25, "qty": 0, "min": 12}, {"name": "Sazon", "category": "Mercearia", "cost": 0, "price": 6.99, "qty": 0, "min": 2}, {"name": "Sal MOC 1kg", "category": "Mercearia", "cost": 2.59, "price": 3.79, "qty": 0, "min": 3}, {"name": "Refrigerante Uliana 2L", "category": "Bebidas", "cost": 4.49, "price": 8, "qty": 0, "min": 6}];
+let products=JSON.parse(localStorage.getItem('raio_sol_app_v2')||'null')||initial,edit=-1;
+const brl=n=>Number(n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const mar=p=>p.cost&&p.price?(p.price-p.cost)/p.price*100:0;
+function persist(){localStorage.setItem('raio_sol_app_v2',JSON.stringify(products))}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+function render(){
+ let q=(document.getElementById('search').value||'').toLowerCase(),list=products.filter(p=>p.name.toLowerCase().includes(q));
+ document.getElementById('list').innerHTML=list.map(p=>{let i=products.indexOf(p);return '<div class="product"><div class="row"><div><div class="name">'+esc(p.name)+'</div><div class="muted">'+esc(p.category)+'</div></div><div class="price">'+brl(p.price)+'</div></div><div class="row" style="margin-top:9px"><span class="muted">Custo '+brl(p.cost)+' · Margem '+mar(p).toFixed(1)+'%</span><button onclick="editP('+i+')">Editar</button></div></div>'}).join('');
+ document.getElementById('count').textContent=products.length;let ms=products.filter(p=>p.cost&&p.price).map(mar);
+ document.getElementById('avg').textContent=(ms.length?ms.reduce((a,b)=>a+b,0)/ms.length:0).toFixed(1)+'%';
+ document.getElementById('low').textContent=products.filter(p=>p.qty<=p.min).length;
+ document.getElementById('stock').textContent=brl(products.reduce((s,p)=>s+(p.qty||0)*(p.cost||0),0));
+ document.getElementById('stocklist').innerHTML=products.map(p=>'<div class="product"><div class="row"><div><div class="name">'+esc(p.name)+'</div><div class="muted">'+esc(p.category)+'</div></div><span class="tag '+(p.qty<=p.min?'low':'')+'">Estoque: '+p.qty+'</span></div></div>').join('');
+}
+function tab(x){['prod','calc','est'].forEach(id=>document.getElementById(id).style.display=id===x?'block':'none');['b1','b2','b3'].forEach(id=>document.getElementById(id).classList.remove('active'));document.getElementById(x==='prod'?'b1':x==='calc'?'b2':'b3').classList.add('active')}
+function newP(){edit=-1;document.getElementById('title').textContent='Novo produto';['n','c','co','pr','q','mi'].forEach(id=>document.getElementById(id).value='');document.getElementById('modal').classList.add('show')}
+function editP(i){edit=i;let p=products[i];document.getElementById('title').textContent='Editar produto';document.getElementById('n').value=p.name;document.getElementById('c').value=p.category;document.getElementById('co').value=p.cost;document.getElementById('pr').value=p.price;document.getElementById('q').value=p.qty;document.getElementById('mi').value=p.min;document.getElementById('modal').classList.add('show')}
+function closeM(){document.getElementById('modal').classList.remove('show')}
+function saveP(){let p={name:n.value.trim(),category:c.value.trim(),cost:Number(co.value)||0,price:Number(pr.value)||0,qty:Number(q.value)||0,min:Number(mi.value)||0};if(!p.name)return alert('Digite o nome do produto.');if(edit<0)products.push(p);else products[edit]=p;persist();closeM();render()}
+function calc(){let c=Number(cc.value)||0,m=Number(mm.value)||0;res.textContent='Preço sugerido: '+brl(c/(1-m/100))}
+cc.oninput=calc;mm.oninput=calc;render();
+</script></body></html>
